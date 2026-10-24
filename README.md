@@ -293,4 +293,4 @@ Team SenseStreet, Devin Hacks Kochi.
 
 ## License
 
-No license file has been added yet, so all rights are reserved by the authors for now.
+MIT
