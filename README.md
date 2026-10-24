@@ -284,13 +284,7 @@ screenshots/                 README screenshots
 - M6: rate limiting per IP, 15-minute session cap with countdown, `/api/slide` caching, same-origin checks, demo script, Vercel config.
 - Measure transcription accuracy for Malayalam and Hindi.
 - Add a license file.
-
-## Team
-
-Team SenseStreet, Devin Hacks Kochi.
-
-- Thomson Leo Thomas ([@thomson-leo-thomas](https://github.com/thomson-leo-thomas))
-
+  
 ## License
 
 MIT
