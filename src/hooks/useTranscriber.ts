@@ -1,8 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CHUNK_MS, MIN_AUDIO_BYTES, extensionForMimeType, pickRecorderMimeType } from "@/lib/audio";
-import { speechLocaleFor, type LanguageCode } from "@/lib/languages";
+import {
+  CHUNK_MS,
+  LEVEL_TICK_MS,
+  MIN_AUDIO_BYTES,
+  MIN_VOICED_MS,
+  VOICE_LEVEL,
+  extensionForMimeType,
+  pickRecorderMimeType,
+  rmsLevel,
+  shouldCutChunk,
+} from "@/lib/audio";
+import { speechLocaleFor, type LanguageCode, type SpeechLanguage } from "@/lib/languages";
 import { transcribeResponseSchema } from "@/lib/transcribe";
 import { getSpeechRecognition, type SpeechRecognitionLike } from "@/lib/speech";
 
@@ -12,7 +22,7 @@ export interface TranscriptSegment {
   id: number;
   text: string;
   source: TranscriptSource;
-  language: LanguageCode;
+  language: SpeechLanguage;
 }
 
 export type TranscriberStatus = "idle" | "starting" | "listening" | "error";
@@ -37,18 +47,41 @@ const INITIAL: State = {
   notice: null,
 };
 
-export function useTranscriber(language: LanguageCode) {
+interface ChunkStats {
+  startedAt: number;
+  silentSince: number | null;
+  voicedMs: number;
+}
+
+interface Meter {
+  ctx: AudioContext;
+  timer: ReturnType<typeof setInterval>;
+}
+
+function localeFor(speak: SpeechLanguage, slides: LanguageCode) {
+  return speechLocaleFor(speak === "auto" ? slides : speak);
+}
+
+/**
+ * Records the mic in short chunks cut at natural pauses (max 6 s) and transcribes each one.
+ * Silent chunks are skipped. Falls back to browser speech recognition if transcription fails.
+ */
+export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: LanguageCode) {
   const [state, setState] = useState<State>(INITIAL);
-  const languageRef = useRef(language);
+  const languageRef = useRef(speakLanguage);
+  const localeRef = useRef(localeFor(speakLanguage, slideLanguage));
   const listeningRef = useRef(false);
   const modeRef = useRef<TranscriptSource>("openai");
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunkRef = useRef<ChunkStats | null>(null);
   const chunkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const meterRef = useRef<Meter | null>(null);
+  const levelRef = useRef(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const seqRef = useRef(0);
 
-  const addSegment = useCallback((seq: number, text: string, source: TranscriptSource, lang: LanguageCode) => {
+  const addSegment = useCallback((seq: number, text: string, source: TranscriptSource, lang: SpeechLanguage) => {
     const clean = text.trim();
     if (!clean) return;
     setState((s) => {
@@ -61,9 +94,20 @@ export function useTranscriber(language: LanguageCode) {
   const stopRecorder = useCallback(() => {
     if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
     chunkTimerRef.current = null;
+    chunkRef.current = null;
     const recorder = recorderRef.current;
     recorderRef.current = null;
     if (recorder && recorder.state !== "inactive") recorder.stop();
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    const meter = meterRef.current;
+    meterRef.current = null;
+    if (meter) {
+      clearInterval(meter.timer);
+      void meter.ctx.close().catch(() => undefined);
+    }
+    levelRef.current = 0;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
@@ -91,7 +135,7 @@ export function useTranscriber(language: LanguageCode) {
     }
     const recognition = new Recognition();
     const lang = languageRef.current;
-    recognition.lang = speechLocaleFor(lang);
+    recognition.lang = localeRef.current;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.onresult = (event) => {
@@ -132,7 +176,7 @@ export function useTranscriber(language: LanguageCode) {
   );
 
   const sendChunk = useCallback(
-    async (blob: Blob, mimeType: string, seq: number, lang: LanguageCode) => {
+    async (blob: Blob, mimeType: string, seq: number, lang: SpeechLanguage) => {
       setState((s) => ({ ...s, pendingChunks: s.pendingChunks + 1 }));
       try {
         const form = new FormData();
@@ -166,25 +210,65 @@ export function useTranscriber(language: LanguageCode) {
       const parts: Blob[] = [];
       const seq = seqRef.current++;
       const lang = languageRef.current;
+      const stats: ChunkStats = { startedAt: Date.now(), silentSince: null, voicedMs: 0 };
+      chunkRef.current = stats;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) parts.push(e.data);
       };
       recorder.onstop = () => {
         const type = recorder.mimeType || mimeType || "audio/webm";
         const blob = new Blob(parts, { type });
-        if (blob.size >= MIN_AUDIO_BYTES && modeRef.current === "openai") void sendChunk(blob, type, seq, lang);
+        const voiced = stats.voicedMs >= MIN_VOICED_MS;
+        if (voiced && blob.size >= MIN_AUDIO_BYTES && modeRef.current === "openai") void sendChunk(blob, type, seq, lang);
         if (listeningRef.current && modeRef.current === "openai" && streamRef.current === stream) {
           recordChunk(stream, mimeType);
         }
       };
       recorderRef.current = recorder;
       recorder.start();
-      chunkTimerRef.current = setTimeout(() => {
-        if (recorder.state !== "inactive") recorder.stop();
-      }, CHUNK_MS);
+      if (!meterRef.current) {
+        // No level meter available: cut on a fixed timer and upload every chunk.
+        stats.voicedMs = MIN_VOICED_MS;
+        chunkTimerRef.current = setTimeout(() => {
+          if (recorder.state !== "inactive") recorder.stop();
+        }, CHUNK_MS);
+      }
     },
     [sendChunk],
   );
+
+  const startMeter = useCallback((stream: MediaStream) => {
+    const Ctx =
+      window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      const ctx = new Ctx();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      const timer = setInterval(() => {
+        analyser.getFloatTimeDomainData(samples);
+        const level = rmsLevel(samples);
+        levelRef.current = levelRef.current * 0.5 + level * 0.5;
+        const stats = chunkRef.current;
+        const recorder = recorderRef.current;
+        if (!stats || !recorder || recorder.state !== "recording") return;
+        const now = Date.now();
+        if (level >= VOICE_LEVEL) {
+          stats.voicedMs += LEVEL_TICK_MS;
+          stats.silentSince = null;
+        } else {
+          stats.silentSince ??= now;
+        }
+        const silentFor = stats.silentSince === null ? 0 : now - stats.silentSince;
+        if (shouldCutChunk(now - stats.startedAt, silentFor)) recorder.stop();
+      }, LEVEL_TICK_MS);
+      meterRef.current = { ctx, timer };
+    } catch {
+      meterRef.current = null;
+    }
+  }, []);
 
   const start = useCallback(async () => {
     if (listeningRef.current) return;
@@ -200,12 +284,13 @@ export function useTranscriber(language: LanguageCode) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       if (!listeningRef.current) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
       streamRef.current = stream;
+      startMeter(stream);
       setState((s) => ({ ...s, status: "listening" }));
       recordChunk(stream, pickRecorderMimeType((t) => MediaRecorder.isTypeSupported(t)));
     } catch (error) {
@@ -214,35 +299,49 @@ export function useTranscriber(language: LanguageCode) {
       setState((s) => ({
         ...s,
         status: "error",
-        error: denied ? "Microphone access was denied. Allow it in your browser settings and try again." : "Could not access the microphone.",
+        error: denied
+          ? "Microphone access was blocked. Allow it for this site in your browser (and open the app in a normal browser tab, not an embedded preview)."
+          : "Could not access the microphone.",
       }));
     }
-  }, [recordChunk, startRecognition]);
+  }, [recordChunk, startMeter, startRecognition]);
 
   const stop = useCallback(() => {
     listeningRef.current = false;
     stopRecorder();
+    stopAudio();
     stopRecognition();
     setState((s) => ({ ...s, status: s.status === "error" ? "error" : "idle" }));
-  }, [stopRecognition, stopRecorder]);
+  }, [stopAudio, stopRecognition, stopRecorder]);
 
   const clear = useCallback(() => {
     setState((s) => ({ ...s, segments: [], interim: "", error: null, notice: null }));
   }, []);
 
   useEffect(() => {
-    languageRef.current = language;
-    if (listeningRef.current && modeRef.current === "browser") {
+    languageRef.current = speakLanguage;
+    const locale = localeFor(speakLanguage, slideLanguage);
+    const changed = locale !== localeRef.current;
+    localeRef.current = locale;
+    if (changed && listeningRef.current && modeRef.current === "browser") {
       stopRecognition();
       startRecognition();
     }
-  }, [language, startRecognition, stopRecognition]);
+  }, [speakLanguage, slideLanguage, startRecognition, stopRecognition]);
 
   useEffect(() => () => {
     listeningRef.current = false;
     stopRecorder();
+    stopAudio();
     stopRecognition();
-  }, [stopRecognition, stopRecorder]);
+  }, [stopAudio, stopRecognition, stopRecorder]);
 
-  return { ...state, isListening: state.status === "listening" || state.status === "starting", start, stop, clear };
+  return {
+    ...state,
+    isListening: state.status === "listening" || state.status === "starting",
+    levelRef,
+    start,
+    stop,
+    clear,
+  };
 }

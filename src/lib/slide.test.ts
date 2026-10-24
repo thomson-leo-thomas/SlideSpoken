@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deckContext, normalizeSlideResponse, parseSlideResponse, slideRequestSchema, slideResponseSchema, type Deck } from "./slide";
+import { deckContext, normalizeSlideResponse, parseSlideResponse, slideRequestSchema, slideResponseSchema, toEmoji, type Deck } from "./slide";
 
 const valid = {
   action: "new",
@@ -7,6 +7,7 @@ const valid = {
   bullets: ["Rooftop panels doubled since 2020", "Cheaper than grid power"],
   layout: "bullets",
   icon: "Sun",
+  emoji: "☀️",
   imageQuery: "solar panels roof",
 };
 
@@ -89,6 +90,7 @@ describe("deckContext", () => {
       bullets: [],
       layout: "bullets" as const,
       icon: "Sparkles" as const,
+      emoji: "✨",
     }));
     const deck: Deck = { slides, activeIndex: 24 };
     const ctx = deckContext(deck);
@@ -96,5 +98,32 @@ describe("deckContext", () => {
     expect(ctx.slides[0].title).toBe("Slide 5");
     expect(ctx.activeIndex).toBe(19);
     expect(ctx.slides[0]).not.toHaveProperty("id");
+  });
+});
+
+describe("emoji, theme and diagram fields", () => {
+  it("extracts the first emoji and falls back to a default", () => {
+    expect(toEmoji("🚀 launch")).toBe("🚀");
+    expect(toEmoji("👩‍🏫")).toBe("👩‍🏫");
+    expect(toEmoji("rocket")).toBe("✨");
+    expect(toEmoji(null)).toBe("✨");
+  });
+  it("normalizes nullable model fields and accepts the compare layout", () => {
+    const parsed = parseSlideResponse({ ...valid, layout: "compare", emoji: "nope", diagram: null, theme: "neon" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({ layout: "compare", emoji: "✨", theme: "neon" });
+    expect(parsed.data?.diagram).toBeUndefined();
+  });
+  it("drops unknown themes and diagram styles", () => {
+    const parsed = parseSlideResponse({ ...valid, layout: "diagram", diagram: "spiral", theme: "rainbow" });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.theme).toBeUndefined();
+    expect(parsed.data?.diagram).toBeUndefined();
+  });
+  it("rejects a non-emoji in strict validation", () => {
+    expect(slideResponseSchema.safeParse({ ...valid, emoji: "abc" }).success).toBe(false);
+  });
+  it("sends the deck theme as context", () => {
+    expect(deckContext({ slides: [], activeIndex: -1, theme: "paper" }).theme).toBe("paper");
   });
 });

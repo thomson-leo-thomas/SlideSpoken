@@ -1,5 +1,5 @@
-export const SLIDE_INTERVAL_MS = 10_000;
-export const PAUSE_MS = 8_000;
+export const SLIDE_INTERVAL_MS = 6_000;
+export const PAUSE_MS = 1_500;
 
 export interface ScheduleState {
   pendingText: string;
@@ -10,7 +10,7 @@ export interface ScheduleState {
   lastSegmentAt: number | null;
 }
 
-/** Request a slide for new text every ~10s, on a speech pause, or when listening stops. */
+/** Request a slide for new text every ~6s, shortly after a speech pause, or when listening stops. */
 export function shouldRequestSlide(s: ScheduleState): boolean {
   if (s.inFlight || !s.pendingText.trim()) return false;
   if (!s.listening) return true;

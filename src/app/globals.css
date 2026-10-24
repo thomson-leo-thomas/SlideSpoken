@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0d12;
+  --background: #07080d;
   --foreground: #e8eaf0;
 }
 
@@ -12,24 +12,80 @@
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(60rem 40rem at 10% -10%, rgba(99, 102, 241, 0.16), transparent 60%),
+    radial-gradient(50rem 35rem at 100% 0%, rgba(217, 70, 239, 0.1), transparent 60%),
+    var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
 }
 
+.glass {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
 @keyframes slide-in {
-  from { opacity: 0; transform: translateX(6%) scale(0.98); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translateX(5%) scale(0.97); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
 }
-
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(0.8cqw); }
+  from { opacity: 0; transform: translateY(1.2cqw); }
   to { opacity: 1; transform: none; }
 }
+@keyframes pop {
+  0% { opacity: 0; transform: scale(0.4) rotate(-12deg); }
+  70% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+  100% { transform: none; }
+}
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(3%, 4%); }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+@keyframes toast {
+  0% { opacity: 0; transform: translateY(-6px); }
+  10%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
 
-.animate-slide-in { animation: slide-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.animate-fade-up { animation: fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-slide-in { animation: slide-in 650ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-up { animation: fade-up 550ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-pop { animation: pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-grow { animation: grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: left; }
+.animate-float { animation: float 9s ease-in-out infinite; }
+.animate-float-slow { animation: float 13s ease-in-out infinite reverse; }
+.animate-spin-slow { animation: spin-slow 24s linear infinite; }
+.animate-toast { animation: toast 2.8s ease both; }
+.shimmer-bar {
+  background: linear-gradient(90deg, transparent, var(--s-accent), var(--s-accent2), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.no-anim * { animation: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-slide-in, .animate-fade-up { animation: none; }
+  *, *::before, *::after { animation: none !important; }
 }

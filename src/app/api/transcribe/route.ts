@@ -4,6 +4,9 @@ import { parseTranscribeForm } from "@/lib/transcribe";
 
 export const runtime = "nodejs";
 
+const AUTO_DETECT_PROMPT =
+  "The speaker may use English, Malayalam or Hindi, sometimes mixed. Transcribe in the original language and script.";
+
 export async function POST(request: Request) {
   let form: FormData;
   try {
@@ -21,7 +24,7 @@ export async function POST(request: Request) {
     const result = await getOpenAI().audio.transcriptions.create({
       file: input.audio,
       model: TRANSCRIBE_MODEL,
-      language: input.language,
+      ...(input.language === "auto" ? { prompt: AUTO_DETECT_PROMPT } : { language: input.language }),
       response_format: "json",
     });
     return NextResponse.json({ text: result.text.trim() });

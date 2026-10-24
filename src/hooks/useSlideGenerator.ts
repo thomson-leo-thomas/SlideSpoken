@@ -143,6 +143,7 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
     generating,
     notice,
     lastCommand,
+    goTo: (index: number) => commit(goToSlide(deckRef.current, index)),
     next: () => commit(goToSlide(deckRef.current, deckRef.current.activeIndex + 1)),
     prev: () => commit(goToSlide(deckRef.current, deckRef.current.activeIndex - 1)),
     reset,

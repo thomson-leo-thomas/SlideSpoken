@@ -1,15 +1,31 @@
 import { z } from "zod";
 import { SLIDE_ICONS, toSlideIcon } from "./icons";
 import { languageSchema } from "./languages";
+import { THEME_NAMES, type ThemeName } from "./themes";
 
 export const MAX_BULLETS = 4;
 export const MAX_BULLET_WORDS = 11;
 
-export const LAYOUTS = ["title", "bullets", "quote", "metric", "diagram"] as const;
+export const LAYOUTS = ["title", "bullets", "quote", "metric", "diagram", "compare"] as const;
 export type SlideLayout = (typeof LAYOUTS)[number];
+
+export const DIAGRAMS = ["flow", "steps", "cycle"] as const;
+export type DiagramStyle = (typeof DIAGRAMS)[number];
+
+export const DEFAULT_EMOJI = "✨";
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Returns the first emoji in the value, or the default emoji. */
+export function toEmoji(value: unknown): string {
+  if (typeof value !== "string" || !PICTOGRAPHIC.test(value)) return DEFAULT_EMOJI;
+  for (const { segment } of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value.trim())) {
+    if (PICTOGRAPHIC.test(segment)) return segment;
+  }
+  return DEFAULT_EMOJI;
 }
 
 export const slideResponseSchema = z.object({
@@ -26,18 +42,22 @@ export const slideResponseSchema = z.object({
     .max(MAX_BULLETS),
   layout: z.enum(LAYOUTS),
   icon: z.enum(SLIDE_ICONS),
+  emoji: z.string().trim().min(1).max(16).refine((e) => PICTOGRAPHIC.test(e), "emoji must be an emoji"),
+  diagram: z.enum(DIAGRAMS).optional(),
+  theme: z.enum(THEME_NAMES).optional(),
   imageQuery: z.string().trim().min(1).max(80).optional(),
 });
 
 export type SlideResponse = z.infer<typeof slideResponseSchema>;
 
-export interface Slide extends Omit<SlideResponse, "action"> {
+export interface Slide extends Omit<SlideResponse, "action" | "theme"> {
   id: string;
 }
 
 export interface Deck {
   slides: Slide[];
   activeIndex: number;
+  theme?: ThemeName;
 }
 
 export const EMPTY_DECK: Deck = { slides: [], activeIndex: -1 };
@@ -56,6 +76,7 @@ export const slideRequestSchema = z.object({
   currentDeck: z.object({
     slides: z.array(deckSlideSchema).max(MAX_DECK_CONTEXT),
     activeIndex: z.number().int().min(-1),
+    theme: z.enum(THEME_NAMES).optional(),
   }),
   language: languageSchema,
 });
@@ -67,7 +88,11 @@ function truncateWords(text: string, max: number): string {
   return words.length <= max ? words.join(" ") : words.slice(0, max).join(" ");
 }
 
-/** Coerces raw model output toward the schema (trims, caps bullets, maps icon) before strict validation. */
+function oneOf<T extends string>(values: readonly T[], value: unknown): T | undefined {
+  return values.find((v) => v === value);
+}
+
+/** Coerces raw model output toward the schema (trims, caps bullets, maps icon/emoji) before strict validation. */
 export function normalizeSlideResponse(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const r = raw as Record<string, unknown>;
@@ -84,6 +109,9 @@ export function normalizeSlideResponse(raw: unknown): unknown {
     title: typeof r.title === "string" ? r.title.trim() : r.title,
     bullets,
     icon: typeof r.icon === "string" || r.icon == null ? toSlideIcon(r.icon as string | null) : r.icon,
+    emoji: toEmoji(r.emoji),
+    diagram: oneOf(DIAGRAMS, r.diagram),
+    theme: oneOf(THEME_NAMES, r.theme),
     imageQuery,
   };
 }
@@ -98,6 +126,7 @@ export function deckContext(deck: Deck): SlideRequest["currentDeck"] {
   return {
     slides: deck.slides.slice(start).map(({ title, bullets, layout }) => ({ title, bullets, layout })),
     activeIndex: deck.activeIndex < 0 ? -1 : Math.max(-1, deck.activeIndex - start),
+    ...(deck.theme ? { theme: deck.theme } : {}),
   };
 }
 
@@ -105,13 +134,16 @@ export function deckContext(deck: Deck): SlideRequest["currentDeck"] {
 export const SLIDE_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["action", "title", "bullets", "layout", "icon", "imageQuery"],
+  required: ["action", "title", "bullets", "layout", "diagram", "icon", "emoji", "theme", "imageQuery"],
   properties: {
     action: { type: "string", enum: ["new", "update"] },
     title: { type: "string" },
     bullets: { type: "array", items: { type: "string" } },
     layout: { type: "string", enum: [...LAYOUTS] },
+    diagram: { anyOf: [{ type: "string", enum: [...DIAGRAMS] }, { type: "null" }] },
     icon: { type: "string", enum: [...SLIDE_ICONS] },
+    emoji: { type: "string" },
+    theme: { type: "string", enum: [...THEME_NAMES] },
     imageQuery: { type: ["string", "null"] },
   },
 } as const;

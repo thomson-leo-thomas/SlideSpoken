@@ -7,6 +7,7 @@ const id = () => `id-${++n}`;
 
 const response = (overrides: Partial<SlideResponse> = {}): SlideResponse => ({
   action: "new",
+  emoji: "✨",
   title: "Title",
   bullets: ["Point"],
   layout: "bullets",
@@ -57,7 +58,7 @@ describe("applySlideResponse", () => {
 
 describe("goToSlide", () => {
   const deck: Deck = {
-    slides: ["a", "b", "c"].map((t) => ({ id: t, title: t, bullets: [], layout: "title" as const, icon: "Sparkles" as const })),
+    slides: ["a", "b", "c"].map((t) => ({ id: t, title: t, bullets: [], layout: "title" as const, icon: "Sparkles" as const, emoji: "✨" })),
     activeIndex: 1,
   };
   it("clamps to bounds", () => {
@@ -116,5 +117,21 @@ describe("addTitleSlide", () => {
     expect(inserted.slides.map((s) => s.title)).toEqual(["A", "A", "B"]);
     expect(inserted.slides[1].layout).toBe("title");
     expect(inserted.activeIndex).toBe(1);
+  });
+});
+
+describe("deck theme", () => {
+  it("adopts the theme from a response and keeps it when later responses omit it", () => {
+    let deck = applySlideResponse(EMPTY_DECK, response({ theme: "forest" }), id);
+    expect(deck.theme).toBe("forest");
+    deck = applySlideResponse(deck, response({ title: "Next" }), id);
+    expect(deck.theme).toBe("forest");
+    deck = applySlideResponse(deck, response({ action: "update", theme: "ocean" }), id);
+    expect(deck.theme).toBe("ocean");
+  });
+  it("keeps the theme through voice commands", () => {
+    const deck = applySlideResponse(EMPTY_DECK, response({ theme: "royal" }), id);
+    expect(addTitleSlide(deck, id, "Title").theme).toBe("royal");
+    expect(makeQuote(deck).theme).toBe("royal");
   });
 });

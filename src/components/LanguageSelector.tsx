@@ -1,30 +1,40 @@
 "use client";
 
-import { Languages } from "lucide-react";
-import { LANGUAGES, type LanguageCode } from "@/lib/languages";
-
-interface Props {
-  value: LanguageCode;
-  onChange: (value: LanguageCode) => void;
+export interface LanguageOption<T extends string> {
+  value: T;
+  label: string;
 }
 
-export function LanguageSelector({ value, onChange }: Props) {
+interface Props<T extends string> {
+  label: string;
+  value: T;
+  options: readonly LanguageOption<T>[];
+  onChange: (value: T) => void;
+}
+
+export function LanguageSelector<T extends string>({ label, value, options, onChange }: Props<T>) {
   return (
-    <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base">
-      <Languages className="h-5 w-5 text-white/60" aria-hidden />
-      <span className="sr-only">Language</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as LanguageCode)}
-        className="bg-transparent text-white outline-none"
-        aria-label="Language"
-      >
-        {LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code} className="bg-neutral-900">
-            {l.label} · {l.nativeLabel}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div role="radiogroup" aria-label={label} className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-wider text-white/45">{label}</span>
+      <div className="flex rounded-xl border border-white/10 bg-black/20 p-1">
+        {options.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(o.value)}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-sm transition ${
+                active ? "bg-white/15 font-semibold text-white shadow-sm" : "text-white/55 hover:text-white"
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

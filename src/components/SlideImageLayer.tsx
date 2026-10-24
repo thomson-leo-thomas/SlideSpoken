@@ -14,15 +14,21 @@ export function SlideImageLayer({ image }: { image: SlideImage }) {
         alt={image.alt ?? ""}
         onLoad={() => setLoaded(true)}
         className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
-        style={{ opacity: loaded ? 0.35 : 0 }}
+        style={{ opacity: loaded ? 0.4 : 0 }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0f1220] via-[#0f1220]/80 to-[#0f1220]/30" />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(90deg, var(--s-bg0) 0%, color-mix(in srgb, var(--s-bg0) 82%, transparent) 50%, color-mix(in srgb, var(--s-bg0) 25%, transparent) 100%)",
+        }}
+      />
       {loaded && image.photographer && (
         <a
           href={image.photographerUrl ?? "https://www.pexels.com"}
           target="_blank"
           rel="noreferrer"
-          className="absolute bottom-[1cqw] right-[1.5cqw] z-10 text-white/40 hover:text-white/70"
+          className="absolute bottom-[1cqw] right-[1.5cqw] z-10 text-[var(--s-muted)] opacity-60 hover:opacity-100"
           style={{ fontSize: "1cqw" }}
         >
           Photo: {image.photographer} / Pexels

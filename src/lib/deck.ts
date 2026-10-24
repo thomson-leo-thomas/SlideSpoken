@@ -1,12 +1,13 @@
 import { DEFAULT_ICON } from "./icons";
-import { EMPTY_DECK, type Deck, type Slide, type SlideResponse } from "./slide";
+import { DEFAULT_EMOJI, EMPTY_DECK, type Deck, type Slide, type SlideResponse } from "./slide";
 
 /**
  * Applies a model response. "update" rewrites the target slide (by id, defaulting to the active slide);
  * "new", or an update with nothing to update, appends a slide and makes it active.
  */
 export function applySlideResponse(deck: Deck, response: SlideResponse, newId: () => string, targetId?: string): Deck {
-  const { action, ...content } = response;
+  const { action, theme, ...content } = response;
+  const nextTheme = theme ?? deck.theme;
   const index = targetId ? deck.slides.findIndex((s) => s.id === targetId) : deck.activeIndex;
 
   if (action === "update" && index >= 0 && index < deck.slides.length) {
@@ -15,11 +16,11 @@ export function applySlideResponse(deck: Deck, response: SlideResponse, newId: (
     if (!content.imageQuery && current.imageQuery) updated.imageQuery = current.imageQuery;
     const slides = deck.slides.slice();
     slides[index] = updated;
-    return { slides, activeIndex: deck.activeIndex };
+    return { ...deck, slides, theme: nextTheme };
   }
 
   const slides = [...deck.slides, { ...content, id: newId() }];
-  return { slides, activeIndex: slides.length - 1 };
+  return { ...deck, slides, activeIndex: slides.length - 1, theme: nextTheme };
 }
 
 export function goToSlide(deck: Deck, index: number): Deck {
@@ -46,8 +47,9 @@ export function addTitleSlide(deck: Deck, newId: () => string, placeholder: stri
     title: current?.title ?? placeholder,
     bullets: [],
     icon: current?.icon ?? DEFAULT_ICON,
+    emoji: current?.emoji ?? DEFAULT_EMOJI,
   };
   const at = deck.activeIndex + 1;
   const slides = [...deck.slides.slice(0, at), slide, ...deck.slides.slice(at)];
-  return { slides, activeIndex: at };
+  return { ...deck, slides, activeIndex: at };
 }

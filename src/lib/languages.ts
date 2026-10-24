@@ -19,3 +19,8 @@ export function speechLocaleFor(code: LanguageCode): string {
 export function titlePlaceholderFor(code: LanguageCode): string {
   return LANGUAGES.find((l) => l.code === code)?.titlePlaceholder ?? "Title";
 }
+
+export const AUTO_DETECT = "auto" as const;
+/** What the presenter speaks: a specific language, or "auto" to let transcription detect it. */
+export const speechLanguageSchema = z.union([languageSchema, z.literal(AUTO_DETECT)]);
+export type SpeechLanguage = LanguageCode | typeof AUTO_DETECT;

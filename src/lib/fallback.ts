@@ -23,5 +23,5 @@ export function fallbackSlide(transcript: string): SlideResponse | null {
     if (bullets.length >= MAX_BULLETS) break;
   }
 
-  return { action: "new", title, bullets: words.length > TITLE_WORDS ? bullets : [], layout: "bullets", icon: "MessageSquare" };
+  return { action: "new", title, bullets: words.length > TITLE_WORDS ? bullets : [], layout: "bullets", icon: "MessageSquare", emoji: "💬" };
 }

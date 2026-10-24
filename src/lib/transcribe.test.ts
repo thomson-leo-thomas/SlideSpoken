@@ -10,7 +10,7 @@ function form(language: string | null, bytes: number | null) {
 }
 
 describe("parseTranscribeForm", () => {
-  it.each(["en", "ml", "hi"])("accepts language %s", (lang) => {
+  it.each(["en", "ml", "hi", "auto"])("accepts language %s", (lang) => {
     const result = parseTranscribeForm(form(lang, 4096));
     expect(result.ok).toBe(true);
   });

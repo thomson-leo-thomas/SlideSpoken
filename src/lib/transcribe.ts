@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { MAX_AUDIO_BYTES, MIN_AUDIO_BYTES } from "./audio";
-import { languageSchema } from "./languages";
+import { speechLanguageSchema, type SpeechLanguage } from "./languages";
 
 export const transcribeResponseSchema = z.object({ text: z.string() });
 export type TranscribeResponse = z.infer<typeof transcribeResponseSchema>;
 
 export type TranscribeInput =
-  | { ok: true; audio: File; language: z.infer<typeof languageSchema> }
+  | { ok: true; audio: File; language: SpeechLanguage }
   | { ok: false; status: number; error: string };
 
 export function parseTranscribeForm(form: FormData): TranscribeInput {
-  const language = languageSchema.safeParse(form.get("language"));
+  const language = speechLanguageSchema.safeParse(form.get("language"));
   if (!language.success) {
     return { ok: false, status: 400, error: "Unsupported language." };
   }
