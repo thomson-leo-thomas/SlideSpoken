@@ -2,17 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Maximize, Minimize, Presentation } from "lucide-react";
+import type { SlideImage } from "@/lib/images";
 import type { Deck } from "@/lib/slide";
+import { SlideImageLayer } from "./SlideImageLayer";
 import { SlideView } from "./SlideView";
 
 interface Props {
   deck: Deck;
   generating: boolean;
+  image?: SlideImage;
   onPrev: () => void;
   onNext: () => void;
 }
 
-export function SlideCanvas({ deck, generating, onPrev, onNext }: Props) {
+export function SlideCanvas({ deck, generating, image, onPrev, onNext }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const slide = deck.slides[deck.activeIndex];
@@ -37,7 +40,10 @@ export function SlideCanvas({ deck, generating, onPrev, onNext }: Props) {
         >
           {slide ? (
             <div key={slide.id} className="animate-slide-in absolute inset-0">
-              <SlideView slide={slide} />
+              {image?.url && <SlideImageLayer key={image.url} image={image} />}
+              <div className="relative h-full">
+                <SlideView slide={slide} />
+              </div>
             </div>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-[1.5cqw] text-white/40">

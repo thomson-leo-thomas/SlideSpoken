@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applySlideResponse, goToSlide } from "./deck";
+import { addTitleSlide, applySlideResponse, goToSlide, makeQuote } from "./deck";
 import { EMPTY_DECK, type Deck, type SlideResponse } from "./slide";
 
 let n = 0;
@@ -69,5 +69,52 @@ describe("goToSlide", () => {
   });
   it("handles an empty deck", () => {
     expect(goToSlide(EMPTY_DECK, 3)).toEqual(EMPTY_DECK);
+  });
+});
+
+describe("applySlideResponse with a target slide", () => {
+  it("updates the slide that was active when the request started, even after navigation", () => {
+    let deck = applySlideResponse(EMPTY_DECK, response({ title: "A" }), id);
+    deck = applySlideResponse(deck, response({ title: "B" }), id);
+    const targetId = deck.slides[1].id;
+    const navigated: Deck = { ...deck, activeIndex: 0 };
+    const updated = applySlideResponse(navigated, response({ action: "update", title: "B2" }), id, targetId);
+    expect(updated.slides.map((s) => s.title)).toEqual(["A", "B2"]);
+    expect(updated.activeIndex).toBe(0);
+  });
+  it("appends when the target slide no longer exists", () => {
+    const deck = applySlideResponse(EMPTY_DECK, response({ title: "A" }), id);
+    const updated = applySlideResponse(deck, response({ action: "update", title: "X" }), id, "missing");
+    expect(updated.slides).toHaveLength(2);
+  });
+});
+
+describe("makeQuote", () => {
+  it("turns the active slide into a quote using its first bullet", () => {
+    const deck = applySlideResponse(EMPTY_DECK, response({ title: "Vision", bullets: ["Power to every home", "x"] }), id);
+    const quoted = makeQuote(deck);
+    expect(quoted.slides[0]).toMatchObject({ layout: "quote", title: "Power to every home", bullets: [], icon: "Quote" });
+    expect(quoted.slides[0].id).toBe(deck.slides[0].id);
+  });
+  it("uses the title when there are no bullets and is a no-op on an empty deck", () => {
+    const deck = applySlideResponse(EMPTY_DECK, response({ title: "Dream big", bullets: [] }), id);
+    expect(makeQuote(deck).slides[0].title).toBe("Dream big");
+    expect(makeQuote(EMPTY_DECK)).toBe(EMPTY_DECK);
+  });
+});
+
+describe("addTitleSlide", () => {
+  it("adds a placeholder title slide to an empty deck", () => {
+    const deck = addTitleSlide(EMPTY_DECK, id, "Title");
+    expect(deck.slides[0]).toMatchObject({ layout: "title", title: "Title", bullets: [] });
+    expect(deck.activeIndex).toBe(0);
+  });
+  it("inserts after the active slide and activates it", () => {
+    let deck = applySlideResponse(EMPTY_DECK, response({ title: "A" }), id);
+    deck = applySlideResponse(deck, response({ title: "B" }), id);
+    const inserted = addTitleSlide({ ...deck, activeIndex: 0 }, id, "Title");
+    expect(inserted.slides.map((s) => s.title)).toEqual(["A", "A", "B"]);
+    expect(inserted.slides[1].layout).toBe("title");
+    expect(inserted.activeIndex).toBe(1);
   });
 });
