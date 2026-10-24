@@ -9,6 +9,16 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter), var(--font-malayalam), var(--font-devanagari), ui-sans-serif, system-ui, sans-serif;
+  /* Landing page */
+  --color-paper: #F5F0E6;
+  --color-paper-light: #FAF7F0;
+  --color-ink: #16130F;
+  --color-muted: #5E564A;
+  --color-gold: #B7791F;
+  --color-gold-dark: #8A5A12;
+  --font-display: var(--nf-display), Georgia, serif;
+  --font-body: var(--nf-body), var(--font-malayalam), var(--font-devanagari), ui-sans-serif, system-ui, sans-serif;
+  --font-code: var(--nf-code), ui-monospace, monospace;
 }
 
 body {
@@ -176,3 +186,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; }
 }
+
+/* Landing page ("/"). Scoped so the demo app is unaffected. */
+body:has(.landing) { background: var(--color-paper); color: var(--color-ink); }
+.landing ::selection { background: rgba(183, 121, 31, 0.3); }
+.landing :focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+.landing .evidence { background: transparent; color: inherit; padding: 0.1em 0; border-bottom: 2px solid rgba(183, 121, 31, 0.35); transition: background-color 250ms, border-color 250ms; }
+.landing .evidence.is-active { background: rgba(183, 121, 31, 0.22); border-bottom-color: var(--color-gold); }
+.landing .caret { display: inline-block; width: 0.55em; height: 1.1em; margin-left: 2px; vertical-align: -0.2em; background: var(--color-ink); animation: caret-blink 1s steps(1) infinite; }
+@keyframes caret-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) { html:has(.landing) { scroll-behavior: smooth; } }
+@media (prefers-reduced-motion: reduce) { .landing * { transition: none !important; } }

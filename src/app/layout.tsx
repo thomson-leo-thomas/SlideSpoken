@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { Inter, Noto_Sans_Devanagari, Noto_Sans_Malayalam, Outfit, Playfair_Display, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"] });
-const grotesk = Space_Grotesk({ variable: "--font-grotesk", subsets: ["latin"] });
-const serif = Playfair_Display({ variable: "--font-serif", subsets: ["latin"] });
-const malayalam = Noto_Sans_Malayalam({ variable: "--font-malayalam", subsets: ["malayalam"] });
-const devanagari = Noto_Sans_Devanagari({ variable: "--font-devanagari", subsets: ["devanagari"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], preload: false });
+const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"], preload: false });
+const grotesk = Space_Grotesk({ variable: "--font-grotesk", subsets: ["latin"], preload: false });
+const serif = Playfair_Display({ variable: "--font-serif", subsets: ["latin"], preload: false });
+const malayalam = Noto_Sans_Malayalam({ variable: "--font-malayalam", subsets: ["malayalam"], preload: false });
+const devanagari = Noto_Sans_Devanagari({ variable: "--font-devanagari", subsets: ["devanagari"], preload: false });
 
 export const metadata: Metadata = {
   title: "Slidespoken",
