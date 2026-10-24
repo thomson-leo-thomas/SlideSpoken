@@ -17,3 +17,5 @@ export function getOpenAI(): OpenAI {
   client ??= new OpenAI({ apiKey });
   return client;
 }
+
+export const SLIDE_MODEL = "gpt-4o-mini";

@@ -22,7 +22,7 @@ npm run typecheck
 npm test           # vitest run
 npm run build
 ```
-Run lint, typecheck, tests and build before every PR, and put the results in the PR description.
+Run lint, typecheck, tests and build before every push.
 
 ## Layout
 ```
@@ -43,7 +43,7 @@ Keep pure logic (schemas, parsing, merge rules) in `src/lib` so it can be unit-t
 - Prefer small, focused changes that follow the existing style. No new dependencies unless the spec calls for them.
 
 ## Workflow
-Work in milestones. Open **one PR per milestone**, then stop and wait for review.
+Work in milestones. Push each finished milestone directly to `main` (no pull requests), then stop and wait for the owner's review.
 
 | Milestone | Scope |
 |---|---|
