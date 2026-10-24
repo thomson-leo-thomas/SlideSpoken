@@ -10,7 +10,6 @@ import {
   extensionForMimeType,
   pickRecorderMimeType,
   rmsLevel,
-  shouldCutChunk,
 } from "@/lib/audio";
 import { detectScriptLanguage, speechLocaleFor, type LanguageCode, type SpeechLanguage } from "@/lib/languages";
 import { transcribeResponseSchema } from "@/lib/transcribe";
@@ -51,8 +50,6 @@ const INITIAL: State = {
 };
 
 interface ChunkStats {
-  startedAt: number;
-  silentSince: number | null;
   voicedMs: number;
 }
 
@@ -69,8 +66,8 @@ function localeFor(speak: SpeechLanguage, slides: LanguageCode) {
 }
 
 /**
- * Records the mic in short chunks cut at natural pauses (max 6 s) and transcribes each one.
- * Silent chunks are skipped. Falls back to browser speech recognition if transcription fails.
+ * Records the mic continuously in 5-second chunks and transcribes each one in the background.
+ * Silent chunks are never uploaded. Falls back to browser speech recognition if transcription fails.
  */
 export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: LanguageCode) {
   const [state, setState] = useState<State>(INITIAL);
@@ -283,7 +280,7 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       const parts: Blob[] = [];
       const seq = seqRef.current++;
       const lang = languageRef.current;
-      const stats: ChunkStats = { startedAt: Date.now(), silentSince: null, voicedMs: 0 };
+      const stats: ChunkStats = { voicedMs: 0 };
       chunkRef.current = stats;
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) parts.push(e.data);
@@ -299,13 +296,11 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       };
       recorderRef.current = recorder;
       recorder.start();
-      if (!meterRef.current) {
-        // No level meter available: cut on a fixed timer and upload every chunk.
-        stats.voicedMs = MIN_VOICED_MS;
-        chunkTimerRef.current = setTimeout(() => {
-          if (recorder.state !== "inactive") recorder.stop();
-        }, CHUNK_MS);
-      }
+      // Without a level meter every chunk is uploaded.
+      if (!meterRef.current) stats.voicedMs = MIN_VOICED_MS;
+      chunkTimerRef.current = setTimeout(() => {
+        if (recorder.state !== "inactive") recorder.stop();
+      }, CHUNK_MS);
     },
     [sendChunk],
   );
@@ -327,15 +322,7 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
         const stats = chunkRef.current;
         const recorder = recorderRef.current;
         if (!stats || !recorder || recorder.state !== "recording") return;
-        const now = Date.now();
-        if (level >= VOICE_LEVEL) {
-          stats.voicedMs += LEVEL_TICK_MS;
-          stats.silentSince = null;
-        } else {
-          stats.silentSince ??= now;
-        }
-        const silentFor = stats.silentSince === null ? 0 : now - stats.silentSince;
-        if (shouldCutChunk(now - stats.startedAt, silentFor)) recorder.stop();
+        if (level >= VOICE_LEVEL) stats.voicedMs += LEVEL_TICK_MS;
       }, LEVEL_TICK_MS);
       meterRef.current = { ctx, timer };
     } catch {

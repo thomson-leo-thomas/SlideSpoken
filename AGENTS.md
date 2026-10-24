@@ -38,7 +38,7 @@ Keep pure logic (schemas, parsing, merge rules) in `src/lib` so it can be unit-t
 - Validate every API input and every LLM output with zod.
 - The demo must never break: every async path needs loading and error states and a graceful fallback.
 - Slide text must be in the presenter's selected language.
-- Audio: each 6-second chunk is recorded by a fresh `MediaRecorder` so every blob is a complete, decodable file. Timesliced chunks after the first have no container header and OpenAI can't decode them.
+- Audio: each 5-second chunk is recorded by a fresh `MediaRecorder` so every blob is a complete, decodable file. Timesliced chunks after the first have no container header and OpenAI can't decode them.
 - Keep the dark theme, large readable type and smooth animations.
 - Prefer small, focused changes that follow the existing style. No new dependencies unless the spec calls for them.
 

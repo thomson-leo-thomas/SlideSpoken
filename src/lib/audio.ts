@@ -1,7 +1,5 @@
-/** Chunks are cut at the first short pause after MIN_CHUNK_MS, and always by CHUNK_MS (6 s). */
-export const CHUNK_MS = 6000;
-export const MIN_CHUNK_MS = 2000;
-export const SILENCE_CUT_MS = 350;
+/** The mic records continuously in fixed 5-second chunks. */
+export const CHUNK_MS = 5000;
 export const LEVEL_TICK_MS = 100;
 /** RMS level above which a frame counts as speech. */
 export const VOICE_LEVEL = 0.015;
@@ -53,9 +51,4 @@ export function rmsLevel(samples: ArrayLike<number>): number {
   let sum = 0;
   for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
   return Math.sqrt(sum / samples.length);
-}
-
-export function shouldCutChunk(elapsedMs: number, silentForMs: number): boolean {
-  if (elapsedMs >= CHUNK_MS) return true;
-  return elapsedMs >= MIN_CHUNK_MS && silentForMs >= SILENCE_CUT_MS;
 }

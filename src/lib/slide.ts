@@ -73,6 +73,8 @@ export const MAX_DECK_CONTEXT = 20;
 
 export const slideRequestSchema = z.object({
   recentTranscript: z.string().trim().min(1).max(MAX_TRANSCRIPT_CHARS),
+  /** The previous chunk, for context only. */
+  previousTranscript: z.string().trim().max(MAX_TRANSCRIPT_CHARS).optional(),
   currentDeck: z.object({
     slides: z.array(deckSlideSchema).max(MAX_DECK_CONTEXT),
     activeIndex: z.number().int().min(-1),
@@ -136,11 +138,20 @@ export function deckContext(deck: Deck): SlideRequest["currentDeck"] {
 export const SLIDE_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["action", "title", "bullets", "layout", "diagram", "icon", "emoji", "theme", "imageQuery"],
+  required: ["action", "title", "titleEvidence", "bullets", "layout", "diagram", "icon", "emoji", "theme", "imageQuery"],
   properties: {
-    action: { type: "string", enum: ["new", "update"] },
+    action: { type: "string", enum: ["new", "update", "skip"] },
     title: { type: "string" },
-    bullets: { type: "array", items: { type: "string" } },
+    titleEvidence: { type: "string" },
+    bullets: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text", "evidence"],
+        properties: { text: { type: "string" }, evidence: { type: "string" } },
+      },
+    },
     layout: { type: "string", enum: [...LAYOUTS] },
     diagram: { anyOf: [{ type: "string", enum: [...DIAGRAMS] }, { type: "null" }] },
     icon: { type: "string", enum: [...SLIDE_ICONS] },

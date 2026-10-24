@@ -1,20 +1,23 @@
-export const SLIDE_INTERVAL_MS = 6_000;
-export const PAUSE_MS = 1_000;
+import { countWords } from "./slide";
+
+/** Chunks with fewer words are carried into the next chunk instead of becoming a slide on their own. */
+export const MIN_CHUNK_WORDS = 6;
+/** A slide stays on screen at least this long before the next one replaces it. */
+export const MIN_DISPLAY_MS = 3000;
 
 export interface ScheduleState {
   pendingText: string;
   inFlight: boolean;
   listening: boolean;
-  now: number;
-  lastRequestAt: number | null;
-  lastSegmentAt: number | null;
 }
 
-/** Request a slide for new text every ~6s, shortly after a speech pause, or when listening stops. */
+/** Request a slide once a chunk brings enough new words, or flush whatever is left when listening stops. */
 export function shouldRequestSlide(s: ScheduleState): boolean {
   if (s.inFlight || !s.pendingText.trim()) return false;
-  if (!s.listening) return true;
-  if (s.lastRequestAt === null) return true;
-  if (s.now - s.lastRequestAt >= SLIDE_INTERVAL_MS) return true;
-  return s.lastSegmentAt !== null && s.now - s.lastSegmentAt >= PAUSE_MS;
+  return !s.listening || countWords(s.pendingText) >= MIN_CHUNK_WORDS;
+}
+
+/** How long to hold a ready slide so the current one has been visible for MIN_DISPLAY_MS. */
+export function displayDelay(now: number, lastShownAt: number | null): number {
+  return lastShownAt === null ? 0 : Math.max(0, MIN_DISPLAY_MS - (now - lastShownAt));
 }

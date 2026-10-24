@@ -27,3 +27,18 @@ describe("forceNew", () => {
     expect(buildSlideMessages(base)[0].content).not.toContain('action must be "new"');
   });
 });
+
+describe("grounding instructions", () => {
+  it("sends the previous chunk as context only and asks for evidence", () => {
+    const [system, user] = buildSlideMessages({
+      recentTranscript: "Costs fell by forty percent",
+      previousTranscript: "Solar panels doubled",
+      currentDeck: { slides: [], activeIndex: -1 },
+      language: "en",
+    });
+    expect(system.content).toContain("context only");
+    expect(system.content).toContain("evidence");
+    expect(system.content).toContain('"skip"');
+    expect(JSON.parse(user.content).previousTranscript).toBe("Solar panels doubled");
+  });
+});
