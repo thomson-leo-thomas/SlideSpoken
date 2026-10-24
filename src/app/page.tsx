@@ -22,7 +22,6 @@ const COMMAND_LABELS: Record<VoiceCommand, string> = {
 
 const SLIDE_OPTIONS: LanguageOption<LanguageCode>[] = LANGUAGES.map((l) => ({ value: l.code, label: l.nativeLabel }));
 const SPEAK_OPTIONS: LanguageOption<SpeechLanguage>[] = [{ value: AUTO_DETECT, label: "Auto" }, ...SLIDE_OPTIONS];
-const CAPTION_CHARS = 110;
 
 export default function Home() {
   const [slideLanguage, setSlideLanguage] = useState<LanguageCode>(DEFAULT_LANGUAGE);
@@ -33,13 +32,7 @@ export default function Home() {
   const imageFor = useSlideImages(slides.deck);
   const activeSlide = slides.deck.slides[slides.deck.activeIndex];
 
-  const latest = t.interim || t.segments.at(-1)?.text || "";
-  const caption =
-    captions && t.isListening && latest
-      ? latest.length > CAPTION_CHARS
-        ? `…${latest.slice(-CAPTION_CHARS)}`
-        : latest
-      : undefined;
+  const live = t.isListening ? t.live || t.interim || t.segments.at(-1)?.text || "" : "";
 
   const clearAll = () => {
     t.clear();
@@ -99,7 +92,9 @@ export default function Home() {
             deck={slides.deck}
             generating={slides.generating}
             image={activeSlide ? imageFor(activeSlide.id, activeSlide.imageQuery) : undefined}
-            caption={caption}
+            live={live}
+            showCaption={captions}
+            levelRef={t.levelRef}
             onPrev={slides.prev}
             onNext={slides.next}
           />

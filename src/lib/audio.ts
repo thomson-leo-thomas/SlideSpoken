@@ -1,7 +1,7 @@
 /** Chunks are cut at the first short pause after MIN_CHUNK_MS, and always by CHUNK_MS (6 s). */
 export const CHUNK_MS = 6000;
-export const MIN_CHUNK_MS = 2500;
-export const SILENCE_CUT_MS = 400;
+export const MIN_CHUNK_MS = 2000;
+export const SILENCE_CUT_MS = 350;
 export const LEVEL_TICK_MS = 100;
 /** RMS level above which a frame counts as speech. */
 export const VOICE_LEVEL = 0.015;

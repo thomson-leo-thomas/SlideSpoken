@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { memo, useEffect, useRef, type CSSProperties } from "react";
 import type { Deck } from "@/lib/slide";
 import { themeVars } from "@/lib/themes";
 import { SlideView } from "./SlideView";
 
-export function SlideStrip({ deck, onSelect }: { deck: Deck; onSelect: (index: number) => void }) {
+export const SlideStrip = memo(function SlideStrip({ deck, onSelect }: { deck: Deck; onSelect: (index: number) => void }) {
   const activeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -41,4 +41,4 @@ export function SlideStrip({ deck, onSelect }: { deck: Deck; onSelect: (index: n
       })}
     </div>
   );
-}
+});

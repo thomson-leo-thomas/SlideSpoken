@@ -1,5 +1,8 @@
-import { Fragment, type CSSProperties } from "react";
+"use client";
+
+import { createContext, Fragment, memo, useContext, useMemo, useState, type CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
+import { spokenBulletIndex } from "@/lib/live";
 import type { Slide } from "@/lib/slide";
 import { SlideIconView } from "./SlideIconView";
 
@@ -19,15 +22,43 @@ function splitLabel(text: string): { label: string | null; body: string } {
 
 function Emoji({ value, size, className = "", style }: { value: string; size: string; className?: string; style?: CSSProperties }) {
   return (
-    <span key={value} className={`emoji animate-pop inline-block leading-none ${className}`} style={{ fontSize: size, ...style }} aria-hidden>
-      {value}
+    <span className="voice-react">
+      <span key={value} className={`emoji animate-pop inline-block leading-none ${className}`} style={{ fontSize: size, ...style }} aria-hidden>
+        {value}
+      </span>
     </span>
   );
 }
 
+type ItemProps = (i: number, className: string) => { className: string; onClick?: () => void; "data-item": true };
+const ItemContext = createContext<ItemProps>((_, className) => ({ className, "data-item": true }));
+const useItem = () => useContext(ItemContext);
+
+interface Props {
+  slide: Slide;
+  /** Recent speech; the bullet being talked about lights up. */
+  spoken?: string;
+  /** Click a bullet to spotlight it. */
+  interactive?: boolean;
+}
+
 /** Renders one slide. Colours and fonts come from theme CSS variables; sizes use container query units. */
-export function SlideView({ slide }: { slide: Slide }) {
+export const SlideView = memo(function SlideView({ slide, spoken, interactive }: Props) {
+  const [spot, setSpot] = useState<number | null>(null);
+  const live = spoken ? spokenBulletIndex(slide.bullets, spoken) : -1;
+  const itemProps = useMemo<ItemProps>(
+    () => (i, className) => {
+      const state = spot !== null ? (i === spot ? "is-spot" : "is-dim") : i === live ? "is-spoken" : "";
+      return {
+        className: `${className} ${state} ${interactive ? "cursor-pointer" : ""}`,
+        onClick: interactive ? () => setSpot((s) => (s === i ? null : i)) : undefined,
+        "data-item": true,
+      };
+    },
+    [spot, live, interactive],
+  );
   return (
+    <ItemContext.Provider value={itemProps}>
     <div className="relative h-full overflow-hidden">
       <SlideIconView
         name={slide.icon}
@@ -36,10 +67,12 @@ export function SlideView({ slide }: { slide: Slide }) {
       />
       <Layout slide={slide} />
     </div>
+    </ItemContext.Provider>
   );
-}
+});
 
 function Layout({ slide }: { slide: Slide }) {
+  const ip = useItem();
   const [first, ...rest] = slide.bullets;
 
   switch (slide.layout) {
@@ -109,7 +142,7 @@ function Layout({ slide }: { slide: Slide }) {
               {rest.map((b, i) => (
                 <span
                   key={`${i}-${b}`}
-                  className={`animate-fade-up rounded-full px-[1.8cqw] py-[0.8cqw] text-[var(--s-muted)] ${card}`}
+                  {...ip(i + 1, `animate-fade-up rounded-full px-[1.8cqw] py-[0.8cqw] text-[var(--s-muted)] ${card}`)}
                   style={{ fontSize: "2cqw", ...delay(i + 1) }}
                 >
                   {b}
@@ -143,7 +176,7 @@ function Layout({ slide }: { slide: Slide }) {
               return (
                 <li
                   key={`${i}-${b}`}
-                  className={`animate-fade-up flex items-center gap-[1.6cqw] px-[2cqw] py-[1.2cqw] ${card}`}
+                  {...ip(i, `animate-fade-up flex items-center gap-[1.6cqw] px-[2cqw] py-[1.2cqw] ${card}`)}
                   style={{ fontSize: "2.6cqw", ...delay(i) }}
                 >
                   <span
@@ -178,13 +211,16 @@ function SlideHeader({ slide }: { slide: Slide }) {
         <h2 key={slide.title} className="animate-fade-up font-bold leading-tight tracking-tight" style={{ fontSize: "4.4cqw" }}>
           {slide.title}
         </h2>
-        <div className="animate-grow mt-[0.9cqw] h-[0.4cqw] w-[8cqw] rounded-full" style={{ background: ACCENT_GRADIENT }} />
+        <div className="voice-bar">
+          <div className="animate-grow mt-[0.9cqw] h-[0.4cqw] w-[8cqw] rounded-full" style={{ background: ACCENT_GRADIENT }} />
+        </div>
       </div>
     </div>
   );
 }
 
 function FlowDiagram({ bullets }: { bullets: string[] }) {
+  const ip = useItem();
   return (
     <div className="flex items-stretch justify-center gap-[1.2cqw]">
       {bullets.map((b, i) => (
@@ -197,7 +233,7 @@ function FlowDiagram({ bullets }: { bullets: string[] }) {
             />
           )}
           <div
-            className={`animate-fade-up flex flex-1 flex-col gap-[1cqw] p-[1.8cqw] ${card}`}
+            {...ip(i, `animate-fade-up flex flex-1 flex-col gap-[1cqw] p-[1.8cqw] ${card}`)}
             style={{ fontSize: "2.1cqw", maxWidth: "21cqw", ...delay(i) }}
           >
             <span className="bg-clip-text font-bold text-transparent" style={{ fontSize: "1.8cqw", ...gradientText }}>
@@ -212,6 +248,7 @@ function FlowDiagram({ bullets }: { bullets: string[] }) {
 }
 
 function StepsDiagram({ bullets }: { bullets: string[] }) {
+  const ip = useItem();
   const n = Math.max(bullets.length, 1);
   return (
     <div className="relative">
@@ -221,7 +258,7 @@ function StepsDiagram({ bullets }: { bullets: string[] }) {
       />
       <div className="relative grid" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
         {bullets.map((b, i) => (
-          <div key={`${i}-${b}`} className="animate-fade-up flex flex-col items-center gap-[1.4cqw] px-[1cqw] text-center" style={delay(i)}>
+          <div key={`${i}-${b}`} {...ip(i, "animate-fade-up flex flex-col items-center gap-[1.4cqw] rounded-[1.2cqw] px-[1cqw] py-[0.6cqw] text-center")} style={delay(i)}>
             <span
               className="flex items-center justify-center rounded-full font-bold"
               style={{
@@ -246,6 +283,7 @@ function StepsDiagram({ bullets }: { bullets: string[] }) {
 }
 
 function CycleDiagram({ slide }: { slide: Slide }) {
+  const ip = useItem();
   const n = slide.bullets.length;
   return (
     <div className="flex h-full items-center gap-[3cqw] px-[6cqw]">
@@ -266,7 +304,7 @@ function CycleDiagram({ slide }: { slide: Slide }) {
               style={{ left: `${50 + 36 * Math.cos(angle)}%`, top: `${50 + 36 * Math.sin(angle)}%`, transform: "translate(-50%, -50%)" }}
             >
               <div
-                className="animate-pop rounded-[1.2cqw] border border-[var(--s-border)] px-[1.4cqw] py-[1cqw] text-center leading-snug shadow-lg"
+                {...ip(i, "animate-pop rounded-[1.2cqw] border border-[var(--s-border)] px-[1.4cqw] py-[1cqw] text-center leading-snug shadow-lg")}
                 style={{ fontSize: "1.8cqw", width: "16cqw", background: "var(--s-bg1)", ...delay(i) }}
               >
                 {b}
@@ -280,6 +318,7 @@ function CycleDiagram({ slide }: { slide: Slide }) {
 }
 
 function CompareLayout({ slide }: { slide: Slide }) {
+  const ip = useItem();
   const half = Math.ceil(slide.bullets.length / 2);
   const columns = [slide.bullets.slice(0, half), slide.bullets.slice(half)];
   const colors = ["var(--s-accent)", "var(--s-accent2)"];
@@ -300,7 +339,7 @@ function CompareLayout({ slide }: { slide: Slide }) {
             {col.map((b, i) => {
               const { label, body } = splitLabel(b);
               return (
-                <div key={`${i}-${b}`}>
+                <div key={`${i}-${b}`} {...ip(c * half + i, "-m-[0.6cqw] rounded-[1cqw] p-[0.6cqw]")}>
                   {label && (
                     <p className="font-bold" style={{ fontSize: "2.6cqw", color: colors[c] }}>
                       {label}

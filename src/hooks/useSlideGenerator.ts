@@ -5,6 +5,7 @@ import { parseVoiceCommands, type VoiceCommand } from "@/lib/commands";
 import { addTitleSlide, applySlideResponse, goToSlide, makeQuote } from "@/lib/deck";
 import { fallbackSlide } from "@/lib/fallback";
 import { titlePlaceholderFor, type LanguageCode } from "@/lib/languages";
+import { shouldForceNew } from "@/lib/live";
 import { shouldRequestSlide } from "@/lib/schedule";
 import { deckContext, EMPTY_DECK, MAX_TRANSCRIPT_CHARS, slideResponseSchema, type Deck } from "@/lib/slide";
 import type { TranscriptSegment } from "./useTranscriber";
@@ -27,6 +28,7 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
   const cleanedRef = useRef(new Map<number, string>());
   const consumedRef = useRef(new Set<number>());
   const inFlightRef = useRef(false);
+  const updatesRef = useRef(new Map<string, number>());
   const lastRequestAtRef = useRef<number | null>(null);
   const lastSegmentAtRef = useRef<number | null>(null);
   const segmentsRef = useRef(segments);
@@ -71,7 +73,9 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
   const requestSlide = useCallback(
     async (ids: number[], recentTranscript: string) => {
       ids.forEach((id) => consumedRef.current.add(id));
-      const targetId = deckRef.current.slides[deckRef.current.activeIndex]?.id;
+      const current = deckRef.current.slides[deckRef.current.activeIndex];
+      const targetId = current?.id;
+      const forceNew = shouldForceNew(current, targetId ? (updatesRef.current.get(targetId) ?? 0) : 0);
       inFlightRef.current = true;
       lastRequestAtRef.current = Date.now();
       setGenerating(true);
@@ -83,6 +87,7 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
             recentTranscript,
             currentDeck: deckContext(deckRef.current),
             language: languageRef.current,
+            ...(forceNew ? { forceNew: true } : {}),
           }),
         });
         const body: unknown = await res.json().catch(() => null);
@@ -94,6 +99,10 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
           throw new Error(message);
         }
         const slide = slideResponseSchema.parse((body as { slide?: unknown })?.slide);
+        if (forceNew) slide.action = "new";
+        if (slide.action === "update" && targetId) {
+          updatesRef.current.set(targetId, (updatesRef.current.get(targetId) ?? 0) + 1);
+        }
         commit(applySlideResponse(deckRef.current, slide, newId, targetId));
         setNotice(null);
       } catch (err) {
@@ -133,19 +142,15 @@ export function useSlideGenerator(segments: TranscriptSegment[], listening: bool
   const reset = useCallback(() => {
     consumedRef.current = new Set(segmentsRef.current.map((s) => s.id));
     lastRequestAtRef.current = null;
+    updatesRef.current.clear();
     commit(EMPTY_DECK);
     setNotice(null);
     setLastCommand(null);
   }, [commit]);
 
-  return {
-    deck,
-    generating,
-    notice,
-    lastCommand,
-    goTo: (index: number) => commit(goToSlide(deckRef.current, index)),
-    next: () => commit(goToSlide(deckRef.current, deckRef.current.activeIndex + 1)),
-    prev: () => commit(goToSlide(deckRef.current, deckRef.current.activeIndex - 1)),
-    reset,
-  };
+  const goTo = useCallback((index: number) => commit(goToSlide(deckRef.current, index)), [commit]);
+  const next = useCallback(() => commit(goToSlide(deckRef.current, deckRef.current.activeIndex + 1)), [commit]);
+  const prev = useCallback(() => commit(goToSlide(deckRef.current, deckRef.current.activeIndex - 1)), [commit]);
+
+  return { deck, generating, notice, lastCommand, goTo, next, prev, reset };
 }

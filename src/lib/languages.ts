@@ -24,3 +24,14 @@ export const AUTO_DETECT = "auto" as const;
 /** What the presenter speaks: a specific language, or "auto" to let transcription detect it. */
 export const speechLanguageSchema = z.union([languageSchema, z.literal(AUTO_DETECT)]);
 export type SpeechLanguage = LanguageCode | typeof AUTO_DETECT;
+
+/** Guesses the language of transcribed text from its script (Malayalam, Devanagari, else English). */
+export function detectScriptLanguage(text: string): LanguageCode {
+  const count = (re: RegExp) => text.match(re)?.length ?? 0;
+  const ml = count(/[\u0D00-\u0D7F]/g);
+  const hi = count(/[\u0900-\u097F]/g);
+  const en = count(/[A-Za-z]/g);
+  if (ml > hi && ml > en) return "ml";
+  if (hi > ml && hi > en) return "hi";
+  return "en";
+}

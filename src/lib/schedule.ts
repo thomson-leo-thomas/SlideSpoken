@@ -1,5 +1,5 @@
 export const SLIDE_INTERVAL_MS = 6_000;
-export const PAUSE_MS = 1_500;
+export const PAUSE_MS = 1_000;
 
 export interface ScheduleState {
   pendingText: string;

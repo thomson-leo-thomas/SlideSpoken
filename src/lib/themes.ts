@@ -1,6 +1,7 @@
 export const THEME_NAMES = ["midnight", "ocean", "forest", "sunset", "ember", "royal", "neon", "paper"] as const;
 export type ThemeName = (typeof THEME_NAMES)[number];
 export type ThemeFont = "rounded" | "grotesk" | "serif";
+export type ThemeTransition = "zoom" | "rise" | "grow" | "wipe" | "punch" | "flip" | "glitch" | "page";
 
 export interface Theme {
   label: string;
@@ -14,6 +15,8 @@ export interface Theme {
   surface: string;
   border: string;
   font: ThemeFont;
+  /** Slide-change animation that suits the mood. */
+  transition: ThemeTransition;
 }
 
 export const THEMES: Record<ThemeName, Theme> = {
@@ -28,6 +31,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(129,140,248,0.10)",
     border: "rgba(129,140,248,0.28)",
     font: "rounded",
+    transition: "zoom",
   },
   ocean: {
     label: "Ocean",
@@ -40,6 +44,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(56,189,248,0.10)",
     border: "rgba(56,189,248,0.30)",
     font: "grotesk",
+    transition: "rise",
   },
   forest: {
     label: "Forest",
@@ -52,6 +57,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(52,211,153,0.10)",
     border: "rgba(52,211,153,0.28)",
     font: "rounded",
+    transition: "grow",
   },
   sunset: {
     label: "Sunset",
@@ -64,6 +70,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(251,146,60,0.10)",
     border: "rgba(251,146,60,0.30)",
     font: "rounded",
+    transition: "wipe",
   },
   ember: {
     label: "Ember",
@@ -76,6 +83,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(248,113,113,0.10)",
     border: "rgba(248,113,113,0.30)",
     font: "grotesk",
+    transition: "punch",
   },
   royal: {
     label: "Royal",
@@ -88,6 +96,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(192,132,252,0.10)",
     border: "rgba(192,132,252,0.30)",
     font: "serif",
+    transition: "flip",
   },
   neon: {
     label: "Neon",
@@ -100,6 +109,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(34,211,238,0.08)",
     border: "rgba(34,211,238,0.32)",
     font: "grotesk",
+    transition: "glitch",
   },
   paper: {
     label: "Paper",
@@ -112,6 +122,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     surface: "rgba(217,119,6,0.08)",
     border: "rgba(31,26,20,0.14)",
     font: "serif",
+    transition: "page",
   },
 };
 

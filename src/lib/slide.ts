@@ -79,6 +79,8 @@ export const slideRequestSchema = z.object({
     theme: z.enum(THEME_NAMES).optional(),
   }),
   language: languageSchema,
+  /** The current slide is full: the model must start a new slide. */
+  forceNew: z.boolean().optional(),
 });
 
 export type SlideRequest = z.infer<typeof slideRequestSchema>;

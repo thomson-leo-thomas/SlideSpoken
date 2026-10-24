@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       console.error("Slide failed validation", slide.error.issues);
       return NextResponse.json({ error: "The model returned an invalid slide." }, { status: 502 });
     }
+    if (parsed.data.forceNew) slide.data.action = "new";
     return NextResponse.json({ slide: slide.data });
   } catch (error) {
     if (error instanceof MissingApiKeyError) {

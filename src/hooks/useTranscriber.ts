@@ -12,7 +12,7 @@ import {
   rmsLevel,
   shouldCutChunk,
 } from "@/lib/audio";
-import { speechLocaleFor, type LanguageCode, type SpeechLanguage } from "@/lib/languages";
+import { detectScriptLanguage, speechLocaleFor, type LanguageCode, type SpeechLanguage } from "@/lib/languages";
 import { transcribeResponseSchema } from "@/lib/transcribe";
 import { getSpeechRecognition, type SpeechRecognitionLike } from "@/lib/speech";
 
@@ -32,6 +32,8 @@ interface State {
   mode: TranscriptSource;
   segments: TranscriptSegment[];
   interim: string;
+  /** Instant rolling caption of what is being said (browser recognition), ahead of accurate transcripts. */
+  live: string;
   pendingChunks: number;
   error: string | null;
   notice: string | null;
@@ -42,6 +44,7 @@ const INITIAL: State = {
   mode: "openai",
   segments: [],
   interim: "",
+  live: "",
   pendingChunks: 0,
   error: null,
   notice: null,
@@ -57,6 +60,9 @@ interface Meter {
   ctx: AudioContext;
   timer: ReturnType<typeof setInterval>;
 }
+
+const LIVE_CHARS = 240;
+const PREVIEW_FATAL = new Set(["not-allowed", "service-not-allowed", "network", "language-not-supported"]);
 
 function localeFor(speak: SpeechLanguage, slides: LanguageCode) {
   return speechLocaleFor(speak === "auto" ? slides : speak);
@@ -79,6 +85,9 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
   const meterRef = useRef<Meter | null>(null);
   const levelRef = useRef(0);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const previewRef = useRef<SpeechRecognitionLike | null>(null);
+  const previewDisabledRef = useRef(false);
+  const liveFinalRef = useRef("");
   const seqRef = useRef(0);
 
   const addSegment = useCallback((seq: number, text: string, source: TranscriptSource, lang: SpeechLanguage) => {
@@ -122,6 +131,57 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
     setState((s) => ({ ...s, interim: "" }));
   }, []);
 
+  const pushLive = useCallback((final: string, interim: string) => {
+    if (final) liveFinalRef.current = `${liveFinalRef.current} ${final}`.trim().slice(-LIVE_CHARS);
+    const live = `${liveFinalRef.current} ${interim}`.trim().slice(-LIVE_CHARS);
+    setState((s) => (s.live === live ? s : { ...s, live }));
+  }, []);
+
+  const stopPreview = useCallback(() => {
+    const preview = previewRef.current;
+    previewRef.current = null;
+    if (preview) {
+      preview.onend = null;
+      preview.abort();
+    }
+  }, []);
+
+  // In OpenAI mode, browser recognition runs alongside purely to show words instantly on screen.
+  const startPreview = useCallback(() => {
+    const Recognition = getSpeechRecognition();
+    if (!Recognition || previewDisabledRef.current || previewRef.current || modeRef.current !== "openai") return;
+    const preview = new Recognition();
+    preview.lang = localeRef.current;
+    preview.continuous = true;
+    preview.interimResults = true;
+    preview.onresult = (event) => {
+      let final = "";
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) final += `${result[0].transcript} `;
+        else interim += result[0].transcript;
+      }
+      pushLive(final.trim(), interim);
+    };
+    preview.onerror = (event) => {
+      if (PREVIEW_FATAL.has(event.error)) previewDisabledRef.current = true;
+    };
+    preview.onend = () => {
+      if (previewRef.current !== preview) return;
+      previewRef.current = null;
+      if (listeningRef.current && modeRef.current === "openai") startPreviewRef.current();
+    };
+    previewRef.current = preview;
+    try {
+      preview.start();
+    } catch {
+      previewRef.current = null;
+    }
+  }, [pushLive]);
+  const startPreviewRef = useRef(startPreview);
+  startPreviewRef.current = startPreview;
+
   const startRecognition = useCallback(() => {
     const Recognition = getSpeechRecognition();
     if (!Recognition) {
@@ -142,10 +202,13 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        if (result.isFinal) addSegment(seqRef.current++, result[0].transcript, "browser", lang);
-        else interim += result[0].transcript;
+        if (result.isFinal) {
+          addSegment(seqRef.current++, result[0].transcript, "browser", lang);
+          pushLive(result[0].transcript, "");
+        } else interim += result[0].transcript;
       }
       setState((s) => ({ ...s, interim }));
+      pushLive("", interim);
     };
     recognition.onerror = (event) => {
       if (event.error === "no-speech" || event.error === "aborted") return;
@@ -158,13 +221,14 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
     };
     recognitionRef.current = recognition;
     recognition.start();
-  }, [addSegment]);
+  }, [addSegment, pushLive]);
 
   const fallBackToBrowser = useCallback(
     (reason: string) => {
       if (modeRef.current === "browser" || !listeningRef.current) return;
       modeRef.current = "browser";
       stopRecorder();
+      stopPreview();
       setState((s) => ({
         ...s,
         mode: "browser",
@@ -172,7 +236,7 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       }));
       startRecognition();
     },
-    [startRecognition, stopRecorder],
+    [startRecognition, stopPreview, stopRecorder],
   );
 
   const sendChunk = useCallback(
@@ -193,6 +257,15 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
         }
         const parsed = transcribeResponseSchema.parse(body);
         addSegment(seq, parsed.text, "openai", lang);
+        if (lang === "auto" && parsed.text.trim()) {
+          // Point the instant-caption recognizer at the language actually being spoken.
+          const locale = speechLocaleFor(detectScriptLanguage(parsed.text));
+          if (locale !== localeRef.current) {
+            localeRef.current = locale;
+            stopPreview();
+            if (listeningRef.current) startPreview();
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Transcription failed.";
         fallBackToBrowser(message);
@@ -200,7 +273,7 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
         setState((s) => ({ ...s, pendingChunks: Math.max(0, s.pendingChunks - 1) }));
       }
     },
-    [addSegment, fallBackToBrowser],
+    [addSegment, fallBackToBrowser, startPreview, stopPreview],
   );
 
   // Each chunk is recorded by its own MediaRecorder so every blob is a complete, decodable file.
@@ -293,6 +366,7 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       startMeter(stream);
       setState((s) => ({ ...s, status: "listening" }));
       recordChunk(stream, pickRecorderMimeType((t) => MediaRecorder.isTypeSupported(t)));
+      startPreview();
     } catch (error) {
       listeningRef.current = false;
       const denied = error instanceof DOMException && error.name === "NotAllowedError";
@@ -304,18 +378,21 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
           : "Could not access the microphone.",
       }));
     }
-  }, [recordChunk, startMeter, startRecognition]);
+  }, [recordChunk, startMeter, startPreview, startRecognition]);
 
   const stop = useCallback(() => {
     listeningRef.current = false;
     stopRecorder();
     stopAudio();
+    stopPreview();
     stopRecognition();
-    setState((s) => ({ ...s, status: s.status === "error" ? "error" : "idle" }));
-  }, [stopAudio, stopRecognition, stopRecorder]);
+    liveFinalRef.current = "";
+    setState((s) => ({ ...s, live: "", status: s.status === "error" ? "error" : "idle" }));
+  }, [stopAudio, stopPreview, stopRecognition, stopRecorder]);
 
   const clear = useCallback(() => {
-    setState((s) => ({ ...s, segments: [], interim: "", error: null, notice: null }));
+    liveFinalRef.current = "";
+    setState((s) => ({ ...s, segments: [], interim: "", live: "", error: null, notice: null }));
   }, []);
 
   useEffect(() => {
@@ -327,14 +404,19 @@ export function useTranscriber(speakLanguage: SpeechLanguage, slideLanguage: Lan
       stopRecognition();
       startRecognition();
     }
-  }, [speakLanguage, slideLanguage, startRecognition, stopRecognition]);
+    if (changed && listeningRef.current && modeRef.current === "openai") {
+      stopPreview();
+      startPreview();
+    }
+  }, [speakLanguage, slideLanguage, startPreview, startRecognition, stopPreview, stopRecognition]);
 
   useEffect(() => () => {
     listeningRef.current = false;
     stopRecorder();
     stopAudio();
+    stopPreview();
     stopRecognition();
-  }, [stopAudio, stopRecognition, stopRecorder]);
+  }, [stopAudio, stopPreview, stopRecognition, stopRecorder]);
 
   return {
     ...state,

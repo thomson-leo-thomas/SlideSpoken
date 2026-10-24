@@ -35,6 +35,9 @@ export function buildSlideMessages(req: SlideRequest) {
     `- theme: the visual theme that best fits the overall talk topic: ${themes}. Keep currentTheme unless the talk's overall topic clearly fits another theme better.`,
     "- imageQuery: 2-4 English words for a striking stock photo of the topic, or null if no photo fits. Always null for metric, diagram and compare.",
     "- If the speech is unclear, still return your best concise slide; never an empty one.",
+    ...(req.forceNew
+      ? ['IMPORTANT: the current slide is complete. action must be "new", and the new slide must summarise only recentTranscript (do not repeat the current slide).']
+      : []),
     `Final check: title and bullets are entirely in ${lang.label}${script}, and nothing appears that the speaker did not say.`,
   ].join("\n");
 

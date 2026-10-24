@@ -19,3 +19,11 @@ describe("buildSlideMessages", () => {
     expect(JSON.parse(user.content).currentSlide).toBeNull();
   });
 });
+
+describe("forceNew", () => {
+  it("tells the model to start a new slide only when asked", () => {
+    const base = { recentTranscript: "More points", currentDeck: { slides: [], activeIndex: -1 }, language: "en" as const };
+    expect(buildSlideMessages({ ...base, forceNew: true })[0].content).toContain('action must be "new"');
+    expect(buildSlideMessages(base)[0].content).not.toContain('action must be "new"');
+  });
+});
