@@ -7,11 +7,11 @@ A 1080×1920, ~48-second Instagram Reel about Slidespoken, made with [Remotion](
 ```bash
 cd video
 npm install
-npm run build        # Remotion render + FFmpeg mix -> out/slidespoken-reel.mp4 and .srt
+npm run build        # FFmpeg sound effects + Remotion render + FFmpeg mix -> out/slidespoken-reel.mp4 and .srt
 npm run studio       # live preview in the browser
 ```
 
-The voice-over and sound files in `public/audio` are committed, so rendering needs no API key. To regenerate them:
+The voice-over clips in `public/audio` are committed, so rendering needs no API key. Sound effects are generated during `npm run build`. To regenerate them separately:
 
 ```bash
 npm run voiceover    # OpenAI TTS (gpt-4o-mini-tts, AI voice); reads OPENAI_API_KEY or ../.env.local

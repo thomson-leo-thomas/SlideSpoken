@@ -9,7 +9,7 @@
     "sfx": "bash scripts/sfx.sh",
     "render": "remotion render src/index.ts Reel out/reel-silent.mp4 --codec=h264 --crf=18",
     "mix": "bash scripts/mix.sh",
-    "build": "npm run render && npm run mix",
+    "build": "npm run sfx && npm run render && npm run mix",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
