@@ -1,0 +1,27 @@
+{
+  "name": "slidespoken-reel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Programmatic Instagram Reel for Slidespoken (Remotion). Isolated from the Next.js app.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "voiceover": "node scripts/voiceover.mjs",
+    "sfx": "bash scripts/sfx.sh",
+    "render": "remotion render src/index.ts Reel out/reel-silent.mp4 --codec=h264 --crf=18",
+    "mix": "bash scripts/mix.sh",
+    "build": "npm run render && npm run mix",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.539",
+    "@remotion/google-fonts": "4.0.539",
+    "@remotion/transitions": "4.0.539",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.12",
+    "typescript": "5.9.3"
+  }
+}
